@@ -1386,9 +1386,7 @@ class Client:  # noqa pylint: disable=too-many-instance-attributes,too-many-publ
 
 
 class DoWorkService(LoopingCallService):
-    _client = None  # type: Client
-
-    def __init__(self, client: Client):
+    def __init__(self, client: Client) -> None:
         super().__init__(interval_seconds=1)
         self._client = client
 
@@ -1421,8 +1419,6 @@ class DoWorkService(LoopingCallService):
 
 
 class MonitoringPublisherService(LoopingCallService):
-    _task_server = None  # type: TaskServer
-
     def __init__(self,
                  task_server: TaskServer,
                  interval_seconds: int) -> None:
@@ -1465,8 +1461,6 @@ class MonitoringPublisherService(LoopingCallService):
 
 
 class NetworkConnectionPublisherService(LoopingCallService):
-    _client = None  # type: Client
-
     def __init__(self,
                  client: Client,
                  interval_seconds: int) -> None:
@@ -1483,8 +1477,6 @@ class NetworkConnectionPublisherService(LoopingCallService):
 
 
 class TaskArchiverService(LoopingCallService):
-    _task_archiver = None  # type: TaskArchiver
-
     def __init__(self,
                  task_archiver: TaskArchiver) -> None:
         super().__init__(interval_seconds=TASKARCHIVE_MAINTENANCE_INTERVAL)
@@ -1495,9 +1487,6 @@ class TaskArchiverService(LoopingCallService):
 
 
 class ResourceCleanerService(LoopingCallService):
-    _client = None  # type: Client
-    older_than_seconds = 0  # type: int
-
     def __init__(self,
                  client: Client,
                  interval_seconds: int,
@@ -1514,8 +1503,6 @@ class ResourceCleanerService(LoopingCallService):
 
 
 class TaskCleanerService(LoopingCallService):
-    _client = None  # type: Client
-
     def __init__(self,
                  client: Client,
                  interval_seconds: int) -> None:
@@ -1527,7 +1514,6 @@ class TaskCleanerService(LoopingCallService):
 
 
 class MaskUpdateService(LoopingCallService):
-
     def __init__(
             self,
             task_manager: TaskManager,
