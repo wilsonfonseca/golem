@@ -8,7 +8,6 @@ from typing import Any, Dict, Tuple, Optional
 import golem_messages.message
 
 import apps.transcoding.common
-import apps.transcoding.common
 from apps.core.task.coretask import CoreTask, CoreTaskBuilder, CoreTaskTypeInfo
 from apps.core.task.coretaskstate import Options, TaskDefinition
 from apps.transcoding.common import TranscodingException
