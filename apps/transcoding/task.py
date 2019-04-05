@@ -228,8 +228,9 @@ class TranscodingTaskBuilder(CoreTaskBuilder):
         task_def.options.output_container = output_container
         task_def.options.audio_params = audio_params
         task_def.options.name = dictionary.get('name', '')
-        logger.debug('Transcoding task definition has been built [definition={}]'
-                     .format(task_def.__dict__))
+        logger.debug(
+            'Transcoding task definition has been built [definition={}]'.
+            format(task_def.__dict__))
         return task_def
 
     @classmethod
