@@ -286,8 +286,9 @@ class TranscodingTaskBuilder(CoreTaskBuilder):
 
     @classmethod
     def get_output_path(cls, dictionary: dict, definition):
-        parent = super(TranscodingTaskBuilder, cls)
-        path = parent.get_output_path(dictionary, definition)
+        path = super(TranscodingTaskBuilder, cls).get_output_path(
+            dictionary,
+            definition)
         options = cls._get_required_field(dictionary, 'options',
                                           is_type_of(dict))
         container = options.get('container', cls._get_presets(
