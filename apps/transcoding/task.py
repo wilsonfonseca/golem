@@ -83,7 +83,7 @@ class TranscodingTask(CoreTask):  # pylint: disable=too-many-instance-attributes
         task_output_dir = dir_manager.get_task_output_dir(task_id)
         # results from providers are collected in tmp
         self.task_dir = dir_manager.get_task_temporary_dir(task_id)
-        if len(self.task_resources) == 0:
+        if len(self.task_resources) == 0: # pylint: disable=len-as-condition
             raise TranscodingException('There is no specified resources')
         stream_operator = StreamOperator()
         chunks = stream_operator.split_video(
