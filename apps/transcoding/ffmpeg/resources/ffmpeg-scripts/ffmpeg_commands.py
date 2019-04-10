@@ -18,7 +18,6 @@ def exec_cmd(cmd, file=None):
     ret = pc.wait()
     if ret != 0:
         exit(ret)
-    return ret
 
 
 def exec_cmd_to_file(cmd, filepath):
