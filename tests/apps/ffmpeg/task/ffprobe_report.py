@@ -124,21 +124,23 @@ class FfprobeFormatReport:
 
     @property
     def duration(self) -> 'FuzzyDuration':
-        return FuzzyDuration(
+        return fuzzy_duration_if_possible(
             self._raw_report.get('format', {}).get('duration', None),
             0.1,
         )
 
     @property
     def start_time(self) -> Optional['FuzzyDuration']:
-        return FuzzyDuration(
+        return fuzzy_duration_if_possible(
             self._raw_report.get('format', {}).get('start_time', None),
             0.1,
         )
 
     @property
     def program_count(self) -> Optional[str]:
-        return self._raw_report.get('format', {}).get('nb_programs', None)
+        return number_if_possible(
+            self._raw_report.get('format', {}).get('nb_programs', None)
+        )
 
     @classmethod
     def _classify_streams(cls,
@@ -427,7 +429,7 @@ class FfprobeStreamReport:
 
     @property
     def start_time(self) -> FuzzyDuration:
-        return FuzzyDuration(
+        return fuzzy_duration_if_possible(
             self._raw_report.get('start_time'),
             0.1,
         )
@@ -499,15 +501,15 @@ class FfprobeAudioAndVideoStreamReport(FfprobeStreamReport):
 
     @property
     def duration(self) -> FuzzyDuration:
-        return FuzzyDuration(self._raw_report.get('duration'), 0.1)
+        return fuzzy_duration_if_possible(self._raw_report.get('duration'), 0.1)
 
     @property
     def bitrate(self) -> FuzzyInt:
-        return FuzzyInt(self._raw_report.get('bit_rate'), 5)
+        return fuzzy_int_if_possible(self._raw_report.get('bit_rate'), 5)
 
     @property
     def frame_count(self) -> Union[str, Any]:
-        return self._raw_report.get('nb_frames')
+        return number_if_possible(self._raw_report.get('nb_frames'))
 
 
 class FfprobeVideoStreamReport(FfprobeAudioAndVideoStreamReport):
@@ -545,16 +547,15 @@ class FfprobeVideoStreamReport(FfprobeAudioAndVideoStreamReport):
 
     @property
     def frame_rate(self)-> Union[float, str, None]:
-        frame_rate = self._raw_report.get('r_frame_rate')
-        if isinstance(frame_rate, (int, float)):
-            return frame_rate
-        elif isinstance(frame_rate, str):
-            splited = frame_rate.split('/')
-            try:
-                return float(splited[0])/float(splited[1])
-            except (ValueError, TypeError):
-                pass
-        return self._raw_report.get('r_frame_rate')
+        value = number_if_possible(self._raw_report.get('r_frame_rate'))
+        if not isinstance(value, str):
+            return value
+
+        splited = value.split('/')
+        try:
+            return float(splited[0])/float(splited[1])
+        except (ValueError, TypeError):
+            return value
 
 
 class FfprobeAudioStreamReport(FfprobeAudioAndVideoStreamReport):
@@ -572,7 +573,7 @@ class FfprobeAudioStreamReport(FfprobeAudioAndVideoStreamReport):
 
     @property
     def sample_rate(self)-> Union[int, Any]:
-        return int(self._raw_report.get('sample_rate'))
+        return number_if_possible(self._raw_report.get('sample_rate'))
 
     @property
     def sample_format(self) -> Optional[str]:
@@ -580,7 +581,7 @@ class FfprobeAudioStreamReport(FfprobeAudioAndVideoStreamReport):
 
     @property
     def channel_count(self)-> Optional[int]:
-        return self._raw_report.get('channels')
+        return number_if_possible(self._raw_report.get('channels'))
 
     @property
     def channel_layout(self)-> Optional[str]:
