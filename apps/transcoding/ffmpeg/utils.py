@@ -32,7 +32,7 @@ class Commands(enum.Enum):
 
 class StreamOperator:
     @HandleError(ValueError, common.not_valid_json)
-    def split_video(self, input_stream: str, parts: int,
+    def split_video(self, input_stream: str, parts: int,  # noqa pylint: disable=too-many-locals
                     dir_manager: DirManager, task_id: str):
         name = os.path.basename(input_stream)
         tmp_task_dir = dir_manager.get_task_temporary_dir(task_id)
