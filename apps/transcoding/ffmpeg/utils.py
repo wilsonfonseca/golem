@@ -86,15 +86,15 @@ class StreamOperator:
                 files))
 
     @staticmethod
-    def _collect_files(dir, files):
+    def _collect_files(directory, files):
         # each chunk must be in the same directory
         results = list()
         for file in files:
             if not os.path.isfile(file):
                 raise ffmpegException("Missing result file: {}".format(file))
-            if os.path.dirname(file) != dir:
+            if os.path.dirname(file) != directory:
                 raise ffmpegException("Result file: {} should be in the \
-                proper directory: {}".format(file, dir))
+                proper directory: {}".format(file, directory))
 
             results.append(file)
 
