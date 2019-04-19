@@ -90,9 +90,9 @@ class TranscodingTask(CoreTask):  # pylint: disable=too-many-instance-attributes
             self.task_resources[0], self.task_definition.subtasks_count,
             dir_manager, task_id)
         if len(chunks) < self.total_tasks:
-            logger.warning('{} subtasks was requested but video splitting '
-                           'process resulted in {} chunks.'
-                           .format(self.total_tasks, len(chunks)))
+            logger.warning('%s subtasks was requested but video splitting '
+                           'process resulted in %s chunks.',
+                           self.total_tasks, len(chunks))
         streams = list(map(lambda x: x[0] if os.path.isabs(x[0]) else os.path
                            .join(task_output_dir, x[0]), chunks))
         playlists = list(map(lambda x: x[1] if os.path.isabs(x[1]) else os.path
@@ -110,8 +110,8 @@ class TranscodingTask(CoreTask):  # pylint: disable=too-many-instance-attributes
 
             self.num_tasks_received += 1
 
-            logger.info("Transcoded {} of {} chunks".
-                        format(self.num_tasks_received, self.total_tasks))
+            logger.info("Transcoded %s of %s chunks",
+                        self.num_tasks_received, self.total_tasks)
 
             if self.num_tasks_received == self.total_tasks:
                 self._merge_video()
@@ -130,16 +130,16 @@ class TranscodingTask(CoreTask):  # pylint: disable=too-many-instance-attributes
         return True
 
     def _get_next_subtask(self):
-        logger.debug('Getting next task [type=trancoding, task_id={}]'.format(
-            self.task_definition.task_id))
+        logger.debug('Getting next task [type=trancoding, task_id=%s]',
+                     self.task_definition.task_id)
         subtasks = self.subtasks_given.values()
         subtasks = filter(lambda sub: sub['status'] in [
             SubtaskStatus.failure, SubtaskStatus.restarted], subtasks)
 
         failed_subtask = next(iter(subtasks), None)
         if failed_subtask:
-            logger.debug('Subtask {} was failed, so let resent it'
-                         .format(failed_subtask['subtask_id']))
+            logger.debug('Subtask %s was failed, so let resent it',
+                         failed_subtask['subtask_id'])
             failed_subtask['status'] = SubtaskStatus.resent
             self.num_failed_subtasks -= 1
             return failed_subtask['subtask_num']
@@ -228,9 +228,8 @@ class TranscodingTaskBuilder(CoreTaskBuilder):
         task_def.options.output_container = output_container
         task_def.options.audio_params = audio_params
         task_def.options.name = dictionary.get('name', '')
-        logger.debug(
-            'Transcoding task definition has been built [definition={}]'.
-            format(task_def.__dict__))
+        logger.debug('Transcoding task definition has been built '
+                     '[definition=%s]', task_def.__dict__)
         return task_def
 
     @classmethod

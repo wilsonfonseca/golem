@@ -46,7 +46,7 @@ class StreamOperator:
             'path_to_stream': stream_container_path,
             'parts': parts
         }
-        logger.debug('Running video splitting [params = {}]'.format(extra_data))
+        logger.debug('Running video splitting [params = %s]', extra_data)
 
         result = self._do_job_in_container(
             self._get_dir_mapping(dir_manager, task_id),
@@ -57,8 +57,8 @@ class StreamOperator:
         if split_result_file not in output_files:
             raise ffmpegException('Result file {} does not exist'.
                                   format(split_result_file))
-        logger.debug('Split result file is = {} [parts = {}]'.
-                     format(split_result_file, parts))
+        logger.debug('Split result file is = %s [parts = %s]',
+                     split_result_file, parts)
         with open(split_result_file) as f:
             params = json.load(f)  # FIXME: check status of splitting
             if params.get('status', 'Success') != 'Success':
@@ -66,8 +66,8 @@ class StreamOperator:
             streams_list = list(map(lambda x: (x.get('video_segment'),
                                                x.get('playlist')),
                                     params.get('segments', [])))
-            logger.info('Stream {} was successfully split to {}'
-                        .format(input_stream, streams_list))
+            logger.info('Stream %s was successfully split to %s',
+                        input_stream, streams_list)
             return streams_list
 
     def _prepare_merge_job(self, task_dir, chunks):
@@ -113,7 +113,7 @@ class StreamOperator:
         }
 
         logger.info('Merging video')
-        logger.debug('Merge params: {}'.format(extra_data))
+        logger.debug('Merge params: %s', extra_data)
 
         dir_mapping = DockerTaskThread.specify_dir_mapping(output=output_dir,
                                                            temporary=work_dir,
