@@ -101,7 +101,7 @@ class StreamOperator:
         return results
 
     def merge_video(self, filename, task_dir, chunks):
-        resources_dir, output_dir, work_dir, chunks = \
+        _, output_dir, work_dir, chunks = \
             self._prepare_merge_job(task_dir, chunks)
 
         extra_data = {
