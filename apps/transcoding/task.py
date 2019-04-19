@@ -26,7 +26,7 @@ class TranscodingTaskOptions(Options):
     class AudioParams:
         def __init__(self,
                      codec: Optional[AudioCodec] = None,
-                     bitrate: Optional[str] = None):
+                     bitrate: Optional[str] = None) -> None:
             self.codec = codec
             self.bitrate = bitrate
 
@@ -35,7 +35,7 @@ class TranscodingTaskOptions(Options):
                      codec: Optional[VideoCodec] = None,
                      bitrate: Optional[str] = None,
                      frame_rate: Optional[int] = None,
-                     resolution: Optional[Tuple[int, int]] = None):
+                     resolution: Optional[Tuple[int, int]] = None) -> None:
             self.codec = codec
             self.bitrate = bitrate
             self.frame_rate = frame_rate
