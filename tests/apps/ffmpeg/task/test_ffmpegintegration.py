@@ -196,6 +196,7 @@ class TestFfmpegIntegration(TestTaskIntegration):
         operation.request_container_change(container)
         operation.request_resolution_change(video["resolution"])
         operation.exclude_from_diff({'video': {'bitrate', 'frame_count'}})
+        operation.enable_treating_missing_attributes_as_unchanged()
 
         if not Container.is_supported(video['container'].value):
             pytest.skip("Source container not supported")
@@ -242,6 +243,7 @@ class TestFfmpegIntegration(TestTaskIntegration):
         operation.request_video_codec_change(video['video_codec'])
         operation.request_container_change(video['container'])
         operation.exclude_from_diff({'video': {'bitrate'}})
+        operation.enable_treating_missing_attributes_as_unchanged()
 
         if not Container.is_supported(video['container'].value):
             pytest.skip("Target container not supported")
@@ -281,6 +283,7 @@ class TestFfmpegIntegration(TestTaskIntegration):
         operation.request_container_change(video['container'])
         operation.request_resolution_change(video["resolution"])
         operation.exclude_from_diff({'video': {'bitrate', 'frame_count'}})
+        operation.enable_treating_missing_attributes_as_unchanged()
 
         if not Container.is_supported(video['container'].value):
             pytest.skip("Target container not supported")
@@ -322,6 +325,7 @@ class TestFfmpegIntegration(TestTaskIntegration):
         operation.request_container_change(video['container'])
         operation.request_resolution_change(video["resolution"])
         operation.exclude_from_diff({'video': {'bitrate'}})
+        operation.enable_treating_missing_attributes_as_unchanged()
 
         if not Container.is_supported(video['container'].value):
             pytest.skip("Target container not supported")
