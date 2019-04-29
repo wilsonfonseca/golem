@@ -22,19 +22,26 @@ from golem.testutils import TempDirFixture
 # TODO: test invalid video file
 
 
-class TestffmpegTask(TempDirFixture):
-    def setUp(self):
-        super(TestffmpegTask, self).setUp()
-        self.RESOURCES = os.path.join(os.path.dirname(
+class PrepareDockerTaskMixin:
+
+    def prepare_docker_task_thread_for_tests(
+            self, new_path: str, test_video_name='test_video.mp4') -> None:
+        self.RESOURCES = os.path.join(os.path.dirname(  # pylint: disable=attribute-defined-outside-init
             os.path.dirname(os.path.realpath(__file__))), 'resources')
-        self.RESOURCE_STREAM = os.path.join(self.RESOURCES, 'test_video.mp4')
-        self.tt = ffmpegTaskTypeInfo()
+        self.RESOURCE_STREAM = os.path.join(self.RESOURCES, test_video_name)  # pylint: disable=attribute-defined-outside-init
+        self.tt = ffmpegTaskTypeInfo()  # pylint: disable=attribute-defined-outside-init
         dm = DockerTaskThread.docker_manager = DockerManager.install()
         dm.update_config(
             status_callback=mock.Mock(),
             done_callback=mock.Mock(),
-            work_dir=self.new_path,
+            work_dir=new_path,
             in_background=True)
+
+
+class TestffmpegTask(TempDirFixture, PrepareDockerTaskMixin):
+    def setUp(self):
+        super(TestffmpegTask, self).setUp()
+        self.prepare_docker_task_thread_for_tests(self.new_path)
 
     def _build_ffmpeg_task(self):
         td = self.tt.task_builder_type.build_definition(self.tt,
