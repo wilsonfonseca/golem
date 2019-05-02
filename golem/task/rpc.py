@@ -16,6 +16,7 @@ from apps.core.task import coretask
 from apps.rendering.task import framerenderingtask
 from apps.rendering.task.renderingtask import RenderingTask
 from golem.core import golem_async
+from golem.core.golem_async import AsyncRequest
 from golem.core import common
 from golem.core import deferred as golem_deferred
 from golem.core import simpleserializer
@@ -218,10 +219,11 @@ def _ensure_task_deposit(client, task, force):
             tasks_num=task.get_total_tasks(),
             force=force,
         )
-        yield client.transaction_system.concent_deposit(
-            required=min_amount,
-            expected=opt_amount,
-        )
+        dep_req = AsyncRequest(client.transaction_system.concent_deposit,
+                               required= min_amount,
+                               expected=opt_amount)
+        yield golem_async.async_run(dep_req)
+
     except eth_exceptions.EthereumError:
         client.funds_locker.remove_task(task_id)
         raise
@@ -345,7 +347,6 @@ def _start_task(client, task, resource_server_result):
 
     client.task_manager.start_task(task.header.task_id)
 
-
 @defer.inlineCallbacks
 def enqueue_new_task(client, task, force=False) \
             -> typing.Generator[defer.Deferred, typing.Any, taskbase.Task]:
@@ -450,16 +451,17 @@ class ClientProvider:
         self._validate_enough_funds_to_pay_for_task(task, force)
         task_id = task.header.task_id
 
-        deferred = enqueue_new_task(self.client, task, force=force)
         # We want to return quickly from create_task without waiting for
         # deferred completion.
-        deferred.addErrback(  # pylint: disable=no-member
+        def_enqueue = AsyncRequest(enqueue_new_task, self.client, task,
+                                   force=force)
+        golem_async.async_run(def_enqueue, error=
             lambda failure: _create_task_error(
                 e=failure.value,
                 _self=self,
                 task_dict=task_dict,
                 force=force
-            ),
+            )
         )
         return task_id, None
 

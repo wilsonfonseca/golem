@@ -1,6 +1,7 @@
 # pylint: disable=protected-access,too-many-ancestors
 import copy
 from tempfile import TemporaryDirectory
+import time
 import unittest
 from unittest import mock
 import uuid
@@ -25,6 +26,7 @@ from golem.task import taskserver
 from golem.task import taskstate
 from golem.task import tasktester
 from golem.task.rpc import ClientProvider
+from golem.tools.testwithreactor import TestWithReactor
 from tests.golem import test_client
 from tests.golem.test_client import TestClientBase
 
@@ -113,7 +115,7 @@ class ProviderBase(test_client.TestClientBase):
         header=mock.MagicMock(task_id='task_id'),
     ),
 )
-class TestCreateTask(ProviderBase, TestClientBase):
+class TestCreateTask(ProviderBase, TestClientBase, TestWithReactor):
     @mock.patch(
         'golem.task.rpc.ClientProvider._validate_lock_funds_possibility'
     )
@@ -122,6 +124,12 @@ class TestCreateTask(ProviderBase, TestClientBase):
         t.name = "test"
 
         result = self.provider.create_task(t.to_dict())
+        started = time.time()
+        while not rpc.enqueue_new_task.called:
+            if time.time() - started > 10:
+                self.fail("Test timed out")
+            time.sleep(0.1)
+
         rpc.enqueue_new_task.assert_called()
         self.assertEqual(result, ('task_id', None))
 
@@ -356,7 +364,8 @@ class TestEnqueueNewTask(ProviderBase):
 
         task = self.client.task_manager.create_task(self.t_dict)
         deferred = rpc.enqueue_new_task(self.client, task)
-        task = golem_deferred.sync_wait(deferred)
+        golem_deferred.sync_wait(deferred)
+        task = self.client.task_manager.tasks[task.header.task_id]
         task_id = task.header.task_id
         assert isinstance(task, taskbase.Task)
         assert task.header.task_id
