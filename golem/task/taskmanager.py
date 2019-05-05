@@ -6,6 +6,7 @@ import time
 import uuid
 from functools import partial
 from pathlib import Path
+from threading import Lock
 from typing import Optional, Dict, List, Iterable
 from zipfile import ZipFile
 
@@ -22,6 +23,7 @@ from golem import model
 from golem.clientconfigdescriptor import ClientConfigDescriptor
 from golem.core.common import get_timestamp_utc, HandleForwardedError, \
     HandleKeyError, node_info_str, short_node_id, to_unicode, update_dict
+from golem.core.golem_async import sync_run
 from golem.manager.nodestatesnapshot import LocalTaskStateSnapshot
 from golem.ranking.manager.database_manager import update_provider_efficiency, \
     update_provider_efficacy
@@ -67,6 +69,9 @@ subtask_priority = {
     SubtaskStatus.downloading: 4,
     SubtaskStatus.finished: 5
 }
+
+
+mutex = Lock()
 
 
 class TaskManager(TaskEventListener):
@@ -181,14 +186,16 @@ class TaskManager(TaskEventListener):
 
     def add_new_task(self, task: Task, estimated_fee: int = 0) -> None:
         task_id = task.header.task_id
-        if task_id in self.tasks:
-            raise RuntimeError("Task {} has been already added"
-                               .format(task.header.task_id))
 
-        task.header.task_owner = self.node
-        self.sign_task_header(task.header)
+        with mutex:
+            if task_id in self.tasks:
+                raise RuntimeError("Task {} has been already added"
+                                   .format(task.header.task_id))
 
-        task.register_listener(self)
+            task.header.task_owner = self.node
+            self.sign_task_header(task.header)
+
+            task.register_listener(self)
 
         ts = TaskState()
         ts.status = TaskStatus.notStarted
@@ -198,8 +205,9 @@ class TaskManager(TaskEventListener):
         ts.estimated_cost = task.price
         ts.estimated_fee = estimated_fee
 
-        self.tasks[task_id] = task
-        self.tasks_states[task_id] = ts
+        with mutex:
+            self.tasks[task_id] = task
+            self.tasks_states[task_id] = ts
         logger.info("Task %s added", task_id)
 
         self._create_task_output_dir(task.task_definition)
@@ -232,13 +240,14 @@ class TaskManager(TaskEventListener):
 
     @handle_task_key_error
     def start_task(self, task_id):
-        task_state = self.tasks_states[task_id]
+        with mutex:
+            task_state = self.tasks_states[task_id]
 
-        if not task_state.status.is_preparing():
-            raise RuntimeError("Task {} has already been started"
-                               .format(task_id))
+            if not task_state.status.is_preparing():
+                raise RuntimeError("Task {} has already been started"
+                                   .format(task_id))
 
-        task_state.status = TaskStatus.waiting
+            task_state.status = TaskStatus.waiting
         self.notice_task_updated(task_id, op=TaskOp.STARTED)
         logger.info("Task %s started", task_id)
 
@@ -314,14 +323,15 @@ class TaskManager(TaskEventListener):
         This is a migration for data stored in pickles.
         See #2768
         """
-        if isinstance(state.status, str):
-            state.status = TaskStatus(state.status)
+        with mutex:
+            if isinstance(state.status, str):
+                state.status = TaskStatus(state.status)
 
-        subtask_state: SubtaskState
-        for subtask_state in state.subtask_states.values():
-            if isinstance(subtask_state.subtask_status, str):
-                subtask_state.subtask_status = \
-                    SubtaskStatus(subtask_state.subtask_status)
+            subtask_state: SubtaskState
+            for subtask_state in state.subtask_states.values():
+                if isinstance(subtask_state.subtask_status, str):
+                    subtask_state.subtask_status = \
+                        SubtaskStatus(subtask_state.subtask_status)
 
     def restore_tasks(self) -> None:
         logger.debug('SEARCHING FOR TASKS TO RESTORE')
@@ -349,11 +359,12 @@ class TaskManager(TaskEventListener):
                     task.register_listener(self)
 
                     task_id = task.header.task_id
-                    self.tasks[task_id] = task
-                    self.tasks_states[task_id] = state
+                    with mutex:
+                        self.tasks[task_id] = task
+                        self.tasks_states[task_id] = state
 
-                    for sub in state.subtask_states.values():
-                        self.subtask2task_mapping[sub.subtask_id] = task_id
+                        for sub in state.subtask_states.values():
+                            self.subtask2task_mapping[sub.subtask_id] = task_id
 
                     logger.debug('TASK %s RESTORED from %r', task_id, path)
 
@@ -366,7 +377,8 @@ class TaskManager(TaskEventListener):
 
     @handle_task_key_error
     def resources_send(self, task_id):
-        self.tasks_states[task_id].status = TaskStatus.waiting
+        with mutex:
+            self.tasks_states[task_id].status = TaskStatus.waiting
         self.notice_task_updated(task_id)
         logger.info("Resources for task {} sent".format(task_id))
 
@@ -867,7 +879,8 @@ class TaskManager(TaskEventListener):
             logger.error("Node_id {} or subtask_id {} does not exist"
                          .format(node_id, subtask_id))
 
-    # CHANGE TO RETURN KEY_ID (check IF SUBTASK COMPUTER HAS KEY_ID
+    # CHANGE TO RETURN KEY_ID (check IF SUBTASK COMPUTER HAS KEY_ID)
+    @sync_run(mutex)
     def check_timeouts(self):
         nodes_with_timeouts = []
         for t in list(self.tasks.values()):
@@ -932,16 +945,17 @@ class TaskManager(TaskEventListener):
         When restarting task, it's put in a final state 'restarted' and
         a new one is created.
         """
-        self.assert_task_can_be_restarted(task_id)
-        if clear_tmp:
-            self.dir_manager.clear_temporary(task_id)
+        with mutex:
+            self.assert_task_can_be_restarted(task_id)
+            if clear_tmp:
+                self.dir_manager.clear_temporary(task_id)
 
-        task_state = self.tasks_states[task_id]
-        task_state.status = TaskStatus.restarted
+            task_state = self.tasks_states[task_id]
+            task_state.status = TaskStatus.restarted
 
-        for ss in self.tasks_states[task_id].subtask_states.values():
-            if ss.subtask_status != SubtaskStatus.failure:
-                ss.subtask_status = SubtaskStatus.restarted
+            for ss in self.tasks_states[task_id].subtask_states.values():
+                if ss.subtask_status != SubtaskStatus.failure:
+                    ss.subtask_status = SubtaskStatus.restarted
 
         logger.info("Task %s put into restarted state", task_id)
         self.notice_task_updated(task_id, op=TaskOp.RESTARTED)
@@ -951,10 +965,11 @@ class TaskManager(TaskEventListener):
         task_id = self.subtask2task_mapping[subtask_id]
         self.tasks[task_id].restart_subtask(subtask_id)
         task_state = self.tasks_states[task_id]
-        task_state.status = TaskStatus.computing
-        subtask_state = task_state.subtask_states[subtask_id]
-        subtask_state.subtask_status = SubtaskStatus.restarted
-        subtask_state.stderr = "[GOLEM] Restarted"
+        with mutex:
+            task_state.status = TaskStatus.computing
+            subtask_state = task_state.subtask_states[subtask_id]
+            subtask_state.subtask_status = SubtaskStatus.restarted
+            subtask_state.stderr = "[GOLEM] Restarted"
 
         self.notice_task_updated(task_id,
                                  subtask_id=subtask_id,
@@ -977,13 +992,14 @@ class TaskManager(TaskEventListener):
 
     @handle_task_key_error
     def delete_task(self, task_id):
-        for sub in list(self.tasks_states[task_id].subtask_states.values()):
-            del self.subtask2task_mapping[sub.subtask_id]
-        self.tasks_states[task_id].subtask_states.clear()
+        with mutex:
+            for sub in list(self.tasks_states[task_id].subtask_states.values()):
+                del self.subtask2task_mapping[sub.subtask_id]
+            self.tasks_states[task_id].subtask_states.clear()
 
-        self.tasks[task_id].unregister_listener(self)
-        del self.tasks[task_id]
-        del self.tasks_states[task_id]
+            self.tasks[task_id].unregister_listener(self)
+            del self.tasks[task_id]
+            del self.tasks_states[task_id]
 
         self.dir_manager.clear_temporary(task_id)
         self.remove_dump(task_id)
@@ -1123,8 +1139,9 @@ class TaskManager(TaskEventListener):
         ss.subtask_status = SubtaskStatus.starting
         ss.price = price
 
-        (self.tasks_states[ctd['task_id']].
-            subtask_states[ctd['subtask_id']]) = ss
+        with mutex:
+            (self.tasks_states[ctd['task_id']].
+                subtask_states[ctd['subtask_id']]) = ss
 
     def notify_update_task(self, task_id):
         self.notice_task_updated(task_id)

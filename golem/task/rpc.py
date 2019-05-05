@@ -24,6 +24,7 @@ from golem.ethereum import exceptions as eth_exceptions
 from golem.resource import resource
 from golem.rpc import utils as rpc_utils
 from golem.task import taskbase, taskkeeper, taskstate, tasktester
+from golem.task.taskmanager import mutex
 from golem.task.taskstate import SubtaskState
 
 logger = logging.getLogger(__name__)
@@ -199,8 +200,9 @@ def _ensure_task_deposit(client, task, force):
         return
 
     task_id = task.header.task_id
-    task_state = client.task_manager.tasks_states[task_id]
-    task_state.status = taskstate.TaskStatus.creatingDeposit
+    with mutex:
+        task_state = client.task_manager.tasks_states[task_id]
+        task_state.status = taskstate.TaskStatus.creatingDeposit
     min_amount, opt_amount = msg_helpers.requestor_deposit_amount(
         task.price,
     )

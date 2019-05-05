@@ -1,9 +1,11 @@
 import logging
 import time
+from threading import Lock
 from typing import Dict, TYPE_CHECKING
 
 from ethereum.utils import denoms
 
+from golem.core.golem_async import sync_run
 from golem.core.service import LoopingCallService
 from golem.core.variables import PAYMENT_DEADLINE
 
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+mutex = Lock()
 
 class TaskFundsLock:
     def __init__(self, subtask_price: int, num_tasks: int, deadline) -> None:
@@ -35,6 +38,7 @@ class FundsLocker(LoopingCallService):
         self.transaction_system: 'TransactionSystem' \
             = transaction_system
 
+    @sync_run(mutex)
     def lock_funds(
             self,
             task_id: str,
@@ -59,6 +63,7 @@ class FundsLocker(LoopingCallService):
         )
         self.task_lock[task_id] = tfl
 
+    @sync_run(mutex)
     def remove_old(self):
         time_ = time.time()
         for task_id, task in list(self.task_lock.items()):
@@ -68,6 +73,7 @@ class FundsLocker(LoopingCallService):
     def _run(self):
         self.remove_old()
 
+    @sync_run(mutex)
     def remove_subtask(self, task_id):
         task_lock = self.task_lock.get(task_id)
         if task_lock is None:
@@ -78,6 +84,7 @@ class FundsLocker(LoopingCallService):
         task_lock.num_tasks -= 1
         self.transaction_system.unlock_funds_for_payments(task_lock.price, 1)
 
+    @sync_run(mutex)
     def remove_task(self, task_id):
         task_lock = self.task_lock.get(task_id)
         if task_lock is None:
@@ -91,6 +98,7 @@ class FundsLocker(LoopingCallService):
             task_lock.num_tasks,
         )
 
+    @sync_run(mutex)
     def add_subtask(self, task_id, num=1):
         task_lock = self.task_lock.get(task_id)
         if task_lock is None:

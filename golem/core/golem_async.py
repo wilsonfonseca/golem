@@ -1,6 +1,7 @@
 import functools
 import logging
 from typing import Callable, Optional
+from threading import Lock
 
 from twisted.internet import defer
 from twisted.internet import threads
@@ -95,5 +96,14 @@ def deferred_run():
                 )
                 execute = defer.execute
             return execute(f, *args, **kwargs)
+        return curry
+    return wrapped
+
+
+def sync_run(lock: Lock):
+    def wrapped(f):
+        def curry(*args, **kwargs):
+            with lock:
+                f(*args, **kwargs)
         return curry
     return wrapped
