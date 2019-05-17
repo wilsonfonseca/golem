@@ -57,7 +57,7 @@ class TestFfprobeFormatReport(TestCase):
 
         self.assertEqual(report_original, report_shuffled)
 
-    def test_missing_streams_should_be_reported(self):
+    def test_missing_modified_stream_should_be_reported(self):
         raw_report_original = copy.deepcopy(RAW_REPORT_ORIGINAL)
         del raw_report_original['streams'][2]
         report_original = FfprobeFormatReport(raw_report_original)
