@@ -65,6 +65,128 @@ def parse_ffprobe_frame_rate(raw_frame_rate: Union[int, float, str, None],
         return value
 
 
+class DiffStreamsSameType:
+
+    def __init__(
+            self,
+            original_stream_reports: List['FfprobeStreamReport'],
+            modified_stream_reports: List['FfprobeStreamReport'],
+            overrides: Optional[FileOverrides] = None,
+            excludes: Optional[FileExcludes] = None,
+    ):
+        assert len(
+            set(r.codec_type for r in original_stream_reports) |
+            set(r.codec_type for r in modified_stream_reports)
+        ) == 1, "All stream reports must have the same codec type"
+
+        if excludes is None:
+            excludes = {}
+        if overrides is None:
+            overrides = {}
+
+        self.excludes = excludes
+        self.overrides = overrides
+        self.modified_stream_reports = modified_stream_reports
+        self.original_stream_reports = original_stream_reports
+        self.unmatched_reports = set(range(len(self.modified_stream_reports)))
+        self.diffs: Diff = []
+
+        self._prepare_diffs()
+
+    def _prepare_diffs(self):
+        self._match_original_reports_with_modified_add_diff_info_if_difference()
+        self._add_info_about_unmatched_stream_if_any_modified_left()
+
+    def _match_original_reports_with_modified_add_diff_info_if_difference(self):
+        for original_idx, original_report in enumerate(
+                self.original_stream_reports
+        ):
+
+            matched_modified_stream_id, modified_stream_index, shortest_diff = \
+                self._find_shortest_diff_to_given_report_and_return_with_indexes(  # noqa pylint: disable=line-too-long
+                    original_report
+                )
+
+            self._add_shortest_diff_with_index_info_to_diffs_if_required(
+                shortest_diff,
+                original_report.index,
+                modified_stream_index,
+                matched_modified_stream_id,
+                original_idx,
+            )
+
+    def _add_info_about_unmatched_stream_if_any_modified_left(self):
+        for modified_idx in self.unmatched_reports:
+            self.diffs.append({
+                'location': self.modified_stream_reports[0].codec_type,
+                'original_stream_index': None,
+                'modified_stream_index': self.modified_stream_reports[
+                    modified_idx].index,
+                'reason': "No matching stream",
+            })
+
+    def _find_shortest_diff_to_given_report_and_return_with_indexes(
+            self,
+            original_report: 'FfprobeStreamReport'
+    ):
+        shortest_diff: Optional[Diff] = None
+        modified_stream_index = None
+        matched_modified_stream_id = None
+        for modified_idx in self.unmatched_reports:
+            new_diff = original_report.diff(
+                self.modified_stream_reports[modified_idx],
+                self.overrides.get(
+                    self.modified_stream_reports[modified_idx].codec_type,
+                    {},
+                ),
+                self.excludes.get(
+                    self.modified_stream_reports[modified_idx].codec_type,
+                    set(),
+                ),
+            )
+
+            if shortest_diff is None or len(shortest_diff) > len(new_diff):
+                assert new_diff is not None
+                shortest_diff = new_diff
+                matched_modified_stream_id = modified_idx
+                modified_stream_index = self.modified_stream_reports[
+                    modified_idx].index
+
+            if len(shortest_diff) == 0:  # pylint: disable=len-as-condition
+                break
+
+        return matched_modified_stream_id, modified_stream_index, shortest_diff
+
+    def _add_shortest_diff_with_index_info_to_diffs_if_required(
+            self,
+            shortest_diff: Optional[Diff],
+            original_report_index: int,
+            modified_stream_index: int,
+            matched_modified_stream_id: int,
+            original_idx: int,
+    ):
+        if shortest_diff is []:
+            return
+
+        elif shortest_diff is not None:
+            for diff_dict in shortest_diff:
+                diff_dict['original_stream_index'] = original_report_index
+                diff_dict['modified_stream_index'] = modified_stream_index
+
+            self.diffs += shortest_diff
+            self.unmatched_reports.remove(matched_modified_stream_id)
+        else:
+            self.diffs.append({
+                'location': self.original_stream_reports[0].codec_type,
+                'original_stream_index': original_idx,
+                'modified_stream_index': None,
+                'reason': "No matching stream",
+            })
+
+    def get_differences(self):
+        return self.diffs
+
+
 class FfprobeFormatReport:
     ATTRIBUTES_TO_COMPARE = {
         'format_name',
@@ -208,10 +330,12 @@ class FfprobeFormatReport:
                 assert new_diff is not None
 
                 if shortest_diff is None or len(shortest_diff) > len(new_diff):
-                    assert new_diff is not None
-                    shortest_diff = new_diff
-                    matched_modified_stream_id = modified_idx
-                    modified_stream_index = modified_stream_reports[modified_idx].index
+                    if 0 < len(diffs) <= len(new_diff):  # pylint: disable=len-as-condition
+                        shortest_diff = []
+                    else:
+                        shortest_diff = new_diff
+                        modified_stream_index = \
+                            modified_stream_reports[modified_idx].index
 
                 if len(shortest_diff) == 0:  # pylint: disable=len-as-condition
                     break
@@ -219,10 +343,14 @@ class FfprobeFormatReport:
             if shortest_diff is not None:
                 for diff_dict in shortest_diff:
                     diff_dict['original_stream_index'] = original_report.index
-                    diff_dict['modified_stream_index'] = modified_stream_index
+                    # shortest_diff not being None guarantees that the loop
+                    # ran at least once so modified_idx is not undefined
+                    diff_dict['modified_stream_index'] = modified_stream_index  # pylint: disable=undefined-loop-variable
 
                 diffs += shortest_diff
-                unmatched_reports.remove(matched_modified_stream_id)
+                unmatched_reports.remove(
+                    modified_idx  # pylint: disable=undefined-loop-variable
+                )
             else:
                 diffs.append({
                     'location': original_stream_reports[0].codec_type,
@@ -263,12 +391,13 @@ class FfprobeFormatReport:
 
         stream_differences: Diff = []
         for codec_type in codec_types_in_buckets:
-            stream_differences += cls._diff_streams_same_type(
+            streams_diff = DiffStreamsSameType(
                 original_reports_by_type.get(codec_type, []),
                 modified_reports_by_type.get(codec_type, []),
                 overrides,
                 excludes,
             )
+            stream_differences += streams_diff.get_differences()
 
         return stream_differences
 
