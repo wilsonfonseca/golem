@@ -199,19 +199,18 @@ class FfprobeFormatReport:
                         shortest_diff = []
                     else:
                         shortest_diff = new_diff
+                        modified_stream_index = \
+                            modified_stream_reports[modified_idx].index
 
                 if len(shortest_diff) == 0:  # pylint: disable=len-as-condition
                     break
 
             if shortest_diff is not None:
                 for diff_dict in shortest_diff:
-                    diff_dict['original_stream_index'] = original_idx
-
+                    diff_dict['original_stream_index'] = original_report.index
                     # shortest_diff not being None guarantees that the loop
                     # ran at least once so modified_idx is not undefined
-                    diff_dict[
-                        'modified_stream_index'
-                    ] = modified_idx  # pylint: disable=undefined-loop-variable
+                    diff_dict['modified_stream_index'] = modified_stream_index  # pylint: disable=undefined-loop-variable
 
                 diffs += shortest_diff
                 unmatched_reports.remove(
@@ -229,7 +228,8 @@ class FfprobeFormatReport:
             diffs.append({
                 'location': modified_stream_reports[0].codec_type,
                 'original_stream_index': None,
-                'modified_stream_index': modified_idx,
+                'modified_stream_index':
+                    modified_stream_reports[modified_idx].index,
                 'reason': "No matching stream",
             })
 
@@ -457,6 +457,10 @@ class FfprobeStreamReport:
             self._raw_report.get('start_time'),
             0.1,
         )
+
+    @property
+    def index(self) -> int:
+        return self._raw_report['index']
 
     # pylint: disable=unsubscriptable-object
     # FIXME: pylint bug, see https://github.com/PyCQA/pylint/issues/2377
