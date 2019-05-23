@@ -192,10 +192,13 @@ class FfprobeFormatReport:
                         set(),
                     ),
                 )
+                assert new_diff is not None
 
                 if shortest_diff is None or len(shortest_diff) > len(new_diff):
-                    assert new_diff is not None
-                    shortest_diff = new_diff
+                    if 0 < len(diffs) <= len(new_diff):  # pylint: disable=len-as-condition
+                        shortest_diff = []
+                    else:
+                        shortest_diff = new_diff
 
                 if len(shortest_diff) == 0:  # pylint: disable=len-as-condition
                     break
