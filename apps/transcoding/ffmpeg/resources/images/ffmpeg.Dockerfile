@@ -30,4 +30,7 @@ COPY --from=ffmpeg-build /usr/local /usr/local
 COPY --from=ffmpeg-build /usr/lib /usr/lib
 COPY --from=ffmpeg-build /lib /lib
 
+COPY ffmpeg-tools/ /ffmpeg-tools/
+RUN pip3 install /ffmpeg-tools/ --upgrade
+
 #ENTRYPOINT []
