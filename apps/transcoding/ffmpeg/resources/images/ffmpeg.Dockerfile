@@ -22,4 +22,9 @@ ENV PYTHONPATH=/golem/scripts:/golem:$PYTHONPATH
 
 RUN ln -s /usr/bin/python3.6 /usr/bin/python3
 
+RUN apt-get update
+RUN apt-get install python3-pip --assume-yes
+COPY ffmpeg-tools/ /ffmpeg-tools/
+RUN pip3 install /ffmpeg-tools/ --upgrade
+
 WORKDIR /golem/work/
