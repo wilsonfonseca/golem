@@ -16,8 +16,6 @@ RUN set -x \
 COPY ffmpeg-scripts/requirements.txt /golem/scripts/requirements.txt
 RUN /golem/install_py_libs.sh -r /golem/scripts/requirements.txt
 
-COPY ffmpeg-scripts/ /golem/scripts/
-
 ENV PYTHONPATH=/golem/scripts:/golem:$PYTHONPATH
 
 RUN ln -s /usr/bin/python3.6 /usr/bin/python3
@@ -26,5 +24,7 @@ RUN apt-get update
 RUN apt-get install python3-pip --assume-yes
 COPY ffmpeg-tools/ /ffmpeg-tools/
 RUN pip3 install /ffmpeg-tools/ --upgrade
+COPY ffmpeg-scripts/ /golem/scripts/
+
 
 WORKDIR /golem/work/
