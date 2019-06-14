@@ -286,6 +286,8 @@ class StreamOperator:
             'command': Commands.COMPUTE_METRICS.value[0],
             'metrics_params': {
                 'metadata': metadata_requests,
+                'frames_count': metadata_requests,
+                'key_frames_count': metadata_requests,
             },
         }
 

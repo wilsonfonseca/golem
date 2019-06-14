@@ -220,6 +220,17 @@ def get_metadata(cmd):
     commands.get_metadata(video_path, output)
 
 
+def get_frames_count(cmd, get_key_frames=False):
+    video_path = os.path.join(RESOURCES_DIR, cmd["video"])
+    output = os.path.join(OUTPUT_DIR, cmd["output"])
+
+    commands.write_or_append_frame_count_to_file(
+        video_path,
+        output,
+        get_key_frames
+    )
+
+
 def compute_metrics(metrics_params):
     if "ssim" in metrics_params:
         compute_metric(metrics_params["ssim"], commands.compute_ssim)
@@ -230,6 +241,14 @@ def compute_metrics(metrics_params):
     if "metadata" in metrics_params:
         for metadata_request in metrics_params["metadata"]:
             get_metadata(metadata_request)
+
+    if "frames_count" in metrics_params:
+        for metadata_request in metrics_params["frames_count"]:
+            get_frames_count(metadata_request)
+
+    if "key_frames_count" in metrics_params:
+        for metadata_request in metrics_params["key_frames_count"]:
+            get_frames_count(metadata_request, get_key_frames=True)
 
 
 def run_ffmpeg(params):
