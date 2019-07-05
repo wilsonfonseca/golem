@@ -174,20 +174,23 @@ def do_replace(input_file,
                replacement_source,
                output_file,
                stream_type,
-               container=None):
+               container=None,
+               output_audio_codec=None):
 
     commands.replace_streams(
         input_file,
         replacement_source,
         output_file,
         stream_type,
-        container)
+        container,
+        output_audio_codec)
 
 
 def do_merge_and_replace(input_file,
                          chunks,
                          output_file,
-                         container=None):
+                         container=None,
+                         output_audio_codec=None):
     output_basename = os.path.basename(output_file)
     [output_stem, output_extension] = os.path.splitext(output_basename)
 
@@ -201,7 +204,8 @@ def do_merge_and_replace(input_file,
         intermediate_file,
         output_file,
         'v',
-        container)
+        container,
+        output_audio_codec)
 
 
 def compute_metric(cmd, function):
@@ -264,13 +268,15 @@ def run_ffmpeg(params):
             params['replacement_source'],
             params['output_file'],
             params['stream_type'],
-            params.get('container'))
+            params.get('container'),
+            params.get('output_audio_codec')),
     elif params['command'] == "merge-and-replace":
         do_merge_and_replace(
             params['input_file'],
             params['chunks'],
             params['output_file'],
-            params.get('container'))
+            params.get('container'),
+            params.get('output_audio_codec')),
     elif params['command'] == "compute-metrics":
         compute_metrics(
             params["metrics_params"])
