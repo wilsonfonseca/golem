@@ -17,6 +17,11 @@ from golem.tools.ci import ci_skip
 @ci_skip
 class TestIntegration(TestCase, DatabaseFixture):
 
+    def setUp(self):
+        TestCase.setUp(self)
+        DatabaseFixture.setUp(self)
+        self.timeout = 1200
+
     @pytest.mark.timeout(60)  # 60 sec should be well enough for this test
     @inlineCallbacks
     def test_io(self):
@@ -83,15 +88,16 @@ class TestIntegration(TestCase, DatabaseFixture):
 
     @inlineCallbacks
     def test_benchmark(self):
-        config = DockerCPUConfig(work_dirs=[Path(tempfile.gettempdir())])
-        env = DockerCPUEnvironment(config)
-        yield env.prepare()
+        for _ in range(100):
+            config = DockerCPUConfig(work_dirs=[Path(tempfile.gettempdir())])
+            env = DockerCPUEnvironment(config)
+            yield env.prepare()
 
-        Whitelist.add(env.BENCHMARK_IMAGE.split('/')[0])
-        score = yield env.run_benchmark()
-        self.assertGreater(score, 0)
+            Whitelist.add(env.BENCHMARK_IMAGE.split('/')[0])
+            score = yield env.run_benchmark()
+            self.assertGreater(score, 0)
 
-        yield env.clean_up()
+            yield env.clean_up()
 
     @inlineCallbacks
     def test_ports(self):
