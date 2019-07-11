@@ -167,7 +167,8 @@ class StreamOperator:
                                         chunks_on_host,
                                         output_file_basename,
                                         task_dir,
-                                        container):
+                                        container,
+                                        audio_params):
 
         assert os.path.isdir(task_dir), \
             "Caller is responsible for ensuring that task dir exists."
@@ -185,6 +186,7 @@ class StreamOperator:
                 os.path.basename(input_file_on_host)),
             'out': os.path.join(DockerJob.OUTPUT_DIR, output_file_basename),
         }
+        ac = audio_params.codec.value if audio_params.codec else None
         extra_data = {
             'entrypoint': FFMPEG_ENTRYPOINT,
             'command': Commands.MERGE_AND_REPLACE.value[0],
@@ -192,6 +194,12 @@ class StreamOperator:
             'chunks': chunks_in_container,
             'output_file': container_files['out'],
             'container': container.value if container is not None else None,
+            'targs': {
+                'audio': {
+                    'codec': ac,
+                    'bitrate': audio_params.bitrate
+                },
+            },
         }
 
         logger.debug('Merge and replace params: %s', extra_data)
