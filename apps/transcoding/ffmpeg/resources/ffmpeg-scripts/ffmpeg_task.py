@@ -21,19 +21,19 @@ class InvalidCommand(Exception):
 def do_extract(input_file,
                output_file,
                selected_streams,
-               container=None):
+               intermediate_container=None):
 
     video_metadata = commands.get_metadata_json(input_file)
-    if container is None:
+    if intermediate_container is None:
         format_demuxer = meta.get_format(video_metadata)
-        container = formats.\
+        intermediate_container = formats.\
             get_safe_intermediate_format_for_demuxer(format_demuxer)
 
     commands.extract_streams(
         input_file,
         output_file,
         selected_streams,
-        container)
+        intermediate_container)
 
     results = {
         "metadata": video_metadata,
@@ -45,25 +45,30 @@ def do_extract(input_file,
     return results
 
 
-def do_split(path_to_stream, parts):
+def do_split(path_to_stream, parts, intermediate_container=None):
     video_metadata = commands.get_metadata_json(path_to_stream)
     video_length = meta.get_duration(video_metadata)
     format_demuxer = meta.get_format(video_metadata)
-    container = formats.get_safe_intermediate_format_for_demuxer(format_demuxer)
+    if intermediate_container is None:
+        intermediate_container = formats.\
+            get_safe_intermediate_format_for_demuxer(format_demuxer)
 
     segment_list_path = commands.split_video(
         path_to_stream,
         OUTPUT_DIR,
         video_length / parts,
-        container)
+        intermediate_container)
+
+    _muxer_info = commands.query_muxer_info(intermediate_container)
+    default_audio_codec = _muxer_info.get('default_audio_codec')
 
     with open(segment_list_path) as segment_list_file:
         segment_filenames = segment_list_file.read().splitlines()
-
     results = {
         "main_list": segment_list_path,
         "segments": [{"video_segment": s} for s in segment_filenames],
         "metadata": video_metadata,
+        "default_audio_codec": default_audio_codec,
     }
 
     results_file = os.path.join(OUTPUT_DIR, "split-results.json")
@@ -73,7 +78,8 @@ def do_split(path_to_stream, parts):
     return results
 
 
-def do_extract_and_split(input_file, parts, container=None):
+def do_extract_and_split(input_file, parts, intermediate_container=None,
+                         container=None):
     input_basename = os.path.basename(input_file)
     [input_stem, input_extension] = os.path.splitext(input_basename)
 
@@ -84,13 +90,14 @@ def do_extract_and_split(input_file, parts, container=None):
     extract_results = do_extract(input_file,
                                  intermediate_file,
                                  ['v'],
-                                 container)
+                                 intermediate_container)
 
-    split_results = do_split(intermediate_file, parts)
+    split_results = do_split(intermediate_file, parts, container)
 
     results = {
         "main_list": split_results["main_list"],
         "segments": split_results["segments"],
+        "default_audio_codec": split_results["default_audio_codec"],
         "metadata": extract_results["metadata"],
     }
 
@@ -176,6 +183,11 @@ def do_replace(input_file,
                stream_type,
                targs,
                container=None):
+    if container is None:
+        video_metadata = commands.get_metadata_json(input_file)
+        format_demuxer = meta.get_format(video_metadata)
+        container = formats.get_safe_intermediate_format_for_demuxer(
+            format_demuxer)
 
     commands.replace_streams(
         input_file,
@@ -247,7 +259,8 @@ def run_ffmpeg(params):
     elif params['command'] == "split":
         do_split(
             params['path_to_stream'],
-            params['parts'])
+            params['parts'],
+            params.get('container'))
     elif params['command'] == "extract-and-split":
         do_extract_and_split(
             params['input_file'],
