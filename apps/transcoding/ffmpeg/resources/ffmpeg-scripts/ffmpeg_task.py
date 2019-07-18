@@ -4,7 +4,7 @@ import os
 import sys
 
 from ffmpeg_tools import commands, formats, meta
-from ffmpeg_tools.commands import get_default_audio_encoder_for_container
+from ffmpeg_tools.commands import muxer_info
 
 OUTPUT_DIR = "/golem/output"
 WORK_DIR = "/golem/work"
@@ -60,8 +60,8 @@ def do_split(path_to_stream, parts, intermediate_container=None):
         video_length / parts,
         intermediate_container)
 
-    default_audio_codec = get_default_audio_encoder_for_container(
-        intermediate_container)
+    _muxer_info = muxer_info(intermediate_container)
+    default_audio_codec = _muxer_info.get('default_audio_codec')
 
     with open(segment_list_path) as segment_list_file:
         segment_filenames = segment_list_file.read().splitlines()
