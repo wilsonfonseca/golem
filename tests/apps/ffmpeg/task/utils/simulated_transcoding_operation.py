@@ -1,6 +1,6 @@
 import os
 import tempfile
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 from ffmpeg_tools.codecs import VideoCodec
 from ffmpeg_tools.formats import Container
@@ -53,11 +53,16 @@ class SimulatedTranscodingOperation:
     def attach_to_report_set(self, report_set: FfprobeReportSet):
         self._ffprobe_report_set = report_set
 
-    def request_container_change(self, new_container: Container):
-        self._task_options['output_container'] = new_container
+    def request_container_change(
+            self,
+            new_container: Container,
+            expected_format_name: Optional[str] = None):
 
-        format_name = new_container.get_demuxer()
-        self.set_override('format', 'format_name', format_name)
+        self._task_options['output_container'] = new_container
+        if expected_format_name is None:
+            expected_format_name = new_container.get_demuxer()
+
+        self.set_override('format', 'format_name', expected_format_name)
 
     def request_video_codec_change(self, new_codec: VideoCodec):
         self._video_options['codec'] = new_codec.value
@@ -98,7 +103,10 @@ class SimulatedTranscodingOperation:
 
     def _build_option_description(self):
         if self._task_options['output_container'] is not None:
-            container = self._task_options['output_container'].value
+            if isinstance(self._task_options['output_container'], str):
+                container = self._task_options['output_container']
+            else:
+                container = self._task_options['output_container'].value
         else:
             container = None
 
@@ -135,9 +143,14 @@ class SimulatedTranscodingOperation:
     def _build_task_def(cls,
                         video_file: str,
                         result_file: str,
-                        container: Container,
+                        container: Union[Container, str, None],
                         video_options: Dict[str, str],
                         subtasks_count: int) -> dict:
+
+        if isinstance(container, Container):
+            container = container.value
+        # Otherwise, we assume container is string or None and leave is as it is
+
         return {
             'type': 'FFMPEG',
             'name': os.path.splitext(os.path.basename(result_file))[0],
@@ -149,14 +162,16 @@ class SimulatedTranscodingOperation:
             'options': {
                 'output_path': os.path.dirname(result_file),
                 'video': video_options if video_options is not None else {},
-                'container': container.value if container is not None else None,
+                'container': container,
             }
         }
 
     def _build_file_names(self, relative_input_file: str):
         if self._task_options['output_container'] is not None:
-            output_extension = "." +\
-                               self._task_options['output_container'].value
+            if isinstance(self._task_options['output_container'], str):
+                output_extension = "." + self._task_options['output_container']
+            else:
+                output_extension = "." + self._task_options['output_container'].value  # noqa: E501  # pylint: disable=line-too-long
         else:
             output_extension = os.path.splitext(relative_input_file)[1]
 
