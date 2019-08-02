@@ -5,13 +5,14 @@ from ffmpeg_tools.codecs import VideoCodec
 from ffmpeg_tools.formats import Container, list_matching_resolutions, \
     list_supported_frame_rates
 from ffmpeg_tools.validation import UnsupportedVideoCodec, InvalidResolution, \
-    UnsupportedVideoCodecConversion, InvalidFrameRate
+    UnsupportedVideoCodecConversion, InvalidFrameRate, \
+    UnsupportedTargetVideoFormat, UnsupportedVideoFormat
 
 from parameterized import parameterized
 import pytest
 
 from apps.transcoding.common import TranscodingTaskBuilderException, \
-    ffmpegException
+    ffmpegException, VideoCodecNotSupportedByContainer
 from apps.transcoding.ffmpeg.task import ffmpegTaskTypeInfo
 from golem.testutils import TestTaskIntegration, \
     remove_temporary_dirtree_if_test_passed
@@ -521,3 +522,101 @@ class TestFfmpegIntegration(TestTaskIntegration):
 
         with self.assertRaises(UnsupportedVideoCodec):
             self.execute_task(task_def)
+
+    def _split_and_merge_video(  # pylint: disable=too-many-arguments
+            self,
+            video,
+            video_codec,
+            container,
+            resolution=None,
+            frame_rate=None,
+            expected_format_name=None):
+
+        resolution = resolution if resolution is not None \
+            else video["resolution"]
+
+        operation = SimulatedTranscodingOperation(
+            task_executor=self,
+            experiment_name="codec change",
+            resource_dir=self.RESOURCES,
+            tmp_dir=self.tempdir,
+            dont_include_in_option_description=["resolution"])
+        operation.attach_to_report_set(self._ffprobe_report_set)
+        operation.request_video_codec_change(video_codec)
+        operation.request_container_change(container, expected_format_name)
+        operation.request_resolution_change(resolution)
+        if frame_rate is not None:
+            operation.request_frame_rate_change(frame_rate)
+
+        operation.exclude_from_diff(
+            TestFfmpegIntegration.ATTRIBUTES_NOT_PRESERVED_IN_CONVERSIONS)
+        operation.exclude_from_diff({'video': {'frame_count'}})
+        operation.enable_treating_missing_attributes_as_unchanged()
+
+        (_input_report, _output_report, diff) = operation.run(
+            video["path"])
+        self.assertEqual(diff, [])
+
+    @pytest.mark.slow
+    @remove_temporary_dirtree_if_test_passed
+    def test_unsupported_target_video_codec(self):
+        with self.assertRaises(VideoCodecNotSupportedByContainer):
+            self._split_and_merge_video(
+                video=self.VIDEO_FILES[0],
+                video_codec=VideoCodec.H_264,
+                container=Container.c_OGG,
+            )
+
+    @pytest.mark.slow
+    @remove_temporary_dirtree_if_test_passed
+    def test_unsupported_target_container_if_exclusive_demuxer(self):
+        with self.assertRaises(UnsupportedTargetVideoFormat):
+            self._split_and_merge_video(
+                video=self.VIDEO_FILES[0],
+                video_codec=VideoCodec.H_264,
+                container=Container.c_MATROSKA_WEBM_DEMUXER,
+            )
+
+    @pytest.mark.slow
+    @remove_temporary_dirtree_if_test_passed
+    def test_invalid_resolution_should_raise_proper_exception(self):
+        with self.assertRaises(InvalidResolution):
+            self._split_and_merge_video(
+                video=self.VIDEO_FILES[0],
+                video_codec=VideoCodec.H_264,
+                container=Container.c_MATROSKA,
+                resolution=[100, 100]
+            )
+
+    @pytest.mark.slow
+    @remove_temporary_dirtree_if_test_passed
+    def test_invalid_frame_rate_should_raise_proper_exception(self):
+        with self.assertRaises(InvalidFrameRate):
+            self._split_and_merge_video(
+                video=self.VIDEO_FILES[0],
+                video_codec=VideoCodec.H_264,
+                container=Container.c_MATROSKA,
+                frame_rate=55
+            )
+
+    @pytest.mark.slow
+    @remove_temporary_dirtree_if_test_passed
+    def test_invalid_frame_rate_should_raise_proper_exception(self):
+        with self.assertRaises(InvalidFrameRate):
+            self._split_and_merge_video(
+                video=self.VIDEO_FILES[0],
+                video_codec=VideoCodec.H_264,
+                container=Container.c_MATROSKA,
+                frame_rate=55
+            )
+
+    @pytest.mark.slow
+    @remove_temporary_dirtree_if_test_passed
+    def test_container_rate_should_raise_proper_exception(self):
+        with self.assertRaises(UnsupportedVideoFormat):
+            self._split_and_merge_video(
+                video=self.VIDEO_FILES[0],
+                video_codec=VideoCodec.H_264,
+                container='unknown container',
+                expected_format_name=''
+            )
