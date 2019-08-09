@@ -167,7 +167,9 @@ class StreamOperator:
                                         chunks_on_host,
                                         output_file_basename,
                                         task_dir,
-                                        container):
+                                        container,
+                                        strip_unsupported_data_streams,
+                                        strip_unsupported_subtitle_streams):
 
         assert os.path.isdir(task_dir), \
             "Caller is responsible for ensuring that task dir exists."
@@ -192,6 +194,9 @@ class StreamOperator:
             'chunks': chunks_in_container,
             'output_file': container_files['out'],
             'container': container.value if container is not None else None,
+            'strip_unsupported_data_streams': strip_unsupported_data_streams,
+            'strip_unsupported_subtitle_streams':
+                strip_unsupported_subtitle_streams
         }
 
         logger.debug('Merge and replace params: %s', extra_data)
