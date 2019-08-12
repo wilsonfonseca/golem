@@ -5,7 +5,8 @@ import pytest
 from ffmpeg_tools.codecs import VideoCodec
 from ffmpeg_tools.formats import Container, list_supported_frame_rates
 from ffmpeg_tools.validation import InvalidResolution, \
-    UnsupportedVideoCodecConversion, InvalidFrameRate, validate_resolution
+    UnsupportedVideoCodecConversion, \
+    InvalidFrameRate, validate_resolution, get_frame_rate_as_int
 
 from apps.transcoding.ffmpeg.task import ffmpegTaskTypeInfo
 from golem.testutils import TestTaskIntegration
@@ -304,15 +305,15 @@ class FfmpegIntegrationBase(TestTaskIntegration):
             pytest.skip("Transcoding is not possible for this file without"
                         "also changing the video codec.")
 
-        frame_rate_as_str_or_int = set([frame_rate, str(frame_rate)])
-        if frame_rate_as_str_or_int & list_supported_frame_rates() != set():
-            (_input_report, _output_report, diff) = operation.run(
-                video["path"])
-            self.assertEqual(diff, [])
-        else:
+        if frame_rate not in list_supported_frame_rates() and \
+                get_frame_rate_as_int(frame_rate) not in \
+                list_supported_frame_rates():
             with self.assertRaises(InvalidFrameRate):
                 operation.run(video["path"])
             pytest.skip("Target frame rate not supported")
+        else:
+            (_input_report, _output_report, diff) = operation.run(video["path"])
+            self.assertEqual(diff, [])
 
     def split_and_merge_with_different_subtask_counts(
             self,
