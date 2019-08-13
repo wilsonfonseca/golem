@@ -26,7 +26,6 @@ from golem.envs.docker.cpu import DockerCPUConfig, DockerCPUEnvironment
 from golem.hardware import scale_memory, MemSize
 from golem.manager.nodestatesnapshot import ComputingSubtaskStateSnapshot
 from golem.resource.dirmanager import DirManager
-from golem.task.task_api import EnvironmentTaskApiService
 from golem.task.envmanager import EnvironmentManager
 from golem.task.timer import ProviderTimer
 from golem.vm.vm import PythonProcVM, PythonTestVM
@@ -208,9 +207,13 @@ class TaskComputerAdapter:
             config_desc=config_desc,
             in_background=in_background))
 
-    def quit(self) -> None:
-        sync_wait(self._new_computer.clean_up())
+    @defer.inlineCallbacks
+    def quit(self) -> defer.Deferred:
+        yield self._new_computer.clean_up()
         self._old_computer.quit()
+
+    def resume(self) -> None:
+        sync_wait(self._new_computer.prepare())
 
 
 class NewTaskComputer:
@@ -244,15 +247,21 @@ class NewTaskComputer:
     @defer.inlineCallbacks
     def prepare(self) -> defer.Deferred:
         # FIXME: Decide when and how to prepare environments
+        logger.debug('NewTaskComputer.prepare')
         docker_env = self._env_manager.environment(DockerCPUEnvironment.ENV_ID)
         yield docker_env.prepare()
+        logger.debug('NewTaskComputer.prepare - AFTER')
+        self._env_manager.set_enabled(DockerCPUEnvironment.ENV_ID, True)
 
     @defer.inlineCallbacks
     def clean_up(self) -> defer.Deferred:
         # FIXME: Decide when and how to clean up environments
         docker_env = self._env_manager.environment(DockerCPUEnvironment.ENV_ID)
+        logger.debug('NewTaskComputer.clean_up')
         if docker_env.status() is not EnvStatus.DISABLED:
             yield docker_env.clean_up()
+            self._env_manager.set_enabled(DockerCPUEnvironment.ENV_ID, False)
+        logger.debug('NewTaskComputer.clean_up - AFTER')
 
     def has_assigned_task(self) -> bool:
         return self._assigned_task is not None
@@ -379,23 +388,6 @@ class NewTaskComputer:
         env_id = self._assigned_task.env_id
         task_id = self._assigned_task.task_id
         return self._work_dir / env_id / task_id
-
-    def _get_task_api_service(self) -> EnvironmentTaskApiService:
-        assert self._assigned_task is not None
-        env_id = self._assigned_task.env_id
-        prereq_dict = self._assigned_task.prereq_dict
-
-        env = self._env_manager.environment(env_id)
-        payload_builder = self._env_manager.payload_builder(env_id)
-        prereq = env.parse_prerequisites(prereq_dict)
-        shared_dir = self._get_task_dir()
-
-        return EnvironmentTaskApiService(
-            env=env,
-            payload_builder=payload_builder,
-            prereq=prereq,
-            shared_dir=shared_dir
-        )
 
     def task_interrupted(self) -> None:
         assert self.has_assigned_task()
