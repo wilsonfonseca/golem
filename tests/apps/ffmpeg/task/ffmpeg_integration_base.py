@@ -205,8 +205,7 @@ class FfmpegIntegrationBase(TestTaskIntegration):
         if not container.is_supported_video_codec(video_codec.value):
             pytest.skip("Target video codec not supported by the container")
 
-        supported_conversions = source_codec.get_supported_conversions()
-        if video_codec.value in supported_conversions:
+        if source_codec.can_convert(video_codec.value):
             (_input_report, _output_report, diff) = operation.run(
                 video["path"])
             self.assertEqual(diff, [])
@@ -250,8 +249,7 @@ class FfmpegIntegrationBase(TestTaskIntegration):
         if not video['container'].is_supported_video_codec(source_codec.value):
             pytest.skip("Target video codec not supported by the container")
 
-        supported_conversions = source_codec.get_supported_conversions()
-        if source_codec.value not in supported_conversions:
+        if source_codec.can_convert(source_codec.value):
             pytest.skip("Transcoding is not possible for this file without"
                         "also changing the video codec.")
 
@@ -299,8 +297,7 @@ class FfmpegIntegrationBase(TestTaskIntegration):
         if not video['container'].is_supported_video_codec(source_codec.value):
             pytest.skip("Target video codec not supported by the container")
 
-        supported_conversions = source_codec.get_supported_conversions()
-        if source_codec.value not in supported_conversions:
+        if source_codec.can_convert(source_codec.value):
             pytest.skip("Transcoding is not possible for this file without"
                         "also changing the video codec.")
 
@@ -349,8 +346,7 @@ class FfmpegIntegrationBase(TestTaskIntegration):
         if not video['container'].is_supported_video_codec(source_codec.value):
             pytest.skip("Target video codec not supported by the container")
 
-        supported_conversions = source_codec.get_supported_conversions()
-        if source_codec.value not in supported_conversions:
+        if source_codec.can_convert(source_codec.value):
             pytest.skip("Transcoding is not possible for this file without"
                         "also changing the video codec.")
 
