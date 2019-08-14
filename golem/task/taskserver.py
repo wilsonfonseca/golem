@@ -451,10 +451,11 @@ class TaskServer(
                     self.task_computer.get_task_resources_dir(),
                     msg.resources_options,
                 ))
-            defer.gatherResults(deferreds).addBoth(
-                lambda _: self.resource_collected(msg.task_id),
-                lambda e: self.resource_failure(msg.task_id, e),
-            )
+            defer.gatherResults(deferreds, consumeErrors=True)\
+                .addCallbacks(
+                    lambda _: self.resource_collected(msg.task_id),
+                    lambda e: self.resource_failure(msg.task_id, e),
+                )
         else:
             self.request_resource(
                 msg.task_id,
@@ -557,13 +558,13 @@ class TaskServer(
         header = self.task_keeper.task_headers[task_id]
 
         if subtask_id not in self.failures_to_send:
-            Trust.REQUESTED.decrease(header.task_owner.key)
-
             self.failures_to_send[subtask_id] = WaitingTaskFailure(
                 task_id=task_id,
                 subtask_id=subtask_id,
                 err_msg=err_msg,
                 owner=header.task_owner)
+
+            Trust.REQUESTED.decrease(header.task_owner.key)
 
     def new_connection(self, session):
         if not self.active:
