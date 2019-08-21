@@ -354,6 +354,7 @@ class TaskPayment(BaseModel):
     expected_amount = HexIntegerField()
     accepted_ts = IntegerField(null=True)
     settled_ts = IntegerField(null=True)  # set if settled by the Concent
+    charged_from_deposit = BooleanField(null=True)
 
     class Meta:
         database = db
