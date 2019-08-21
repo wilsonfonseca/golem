@@ -159,7 +159,6 @@ class LocalhostRuntime(RuntimeBase):
         return defer.succeed(None)
 
     def _spawn_server(self) -> None:
-        self._server_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._server_loop)
         try:
             self._server_loop.run_until_complete(entrypoint(
@@ -174,17 +173,18 @@ class LocalhostRuntime(RuntimeBase):
             self._stopped()
 
     def start(self) -> defer.Deferred:
+        self._server_loop = asyncio.new_event_loop()
         self._server_thread = Thread(target=self._spawn_server, daemon=False)
         self._server_thread.start()
         self._started()
         return defer.succeed(None)
 
     def stop(self) -> defer.Deferred:
-        assert self._server is not None
         assert self._server_loop is not None
         assert self._server_thread is not None
         try:
-            self._server_loop.run_until_complete(self._server.stop())
+            self._server_loop.call_soon_threadsafe(self._server_loop.stop)
+            self._server_loop.call_soon_threadsafe(self._server_loop.close)
         except Exception:  # pylint: disable=broad-except
             return defer.fail()
 

@@ -8,7 +8,7 @@ import tempfile
 import uuid
 from math import ceil
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, ANY
+from unittest.mock import Mock, MagicMock, patch, ANY, call
 
 from pydispatch import dispatcher
 import freezegun
@@ -1751,12 +1751,12 @@ class TestNewTaskComputerIntegration(
         self.addCleanup(trust_patch.stop)
         self.trust = trust_patch.start()
 
-        self.task_finished_cb = Mock()
+        self.task_finished = defer.Deferred()
         self.task_server = TaskServer(
             node=dt_p2p_factory.Node(),
             config_desc=ClientConfigDescriptor(),
             client=self.client,
-            task_finished_cb=self.task_finished_cb,
+            task_finished_cb=lambda: self.task_finished.callback(None),
             use_docker_manager=False
         )
 
@@ -1793,18 +1793,14 @@ class TestNewTaskComputerIntegration(
         self.comp_task_keeper.get_task_header.return_value = task_header
         self.comp_task_keeper.get_node_for_task_id.return_value = 'test_node'
         self.comp_task_keeper.active_tasks = {task_id: comp_task_info}
-        self.resource_manager.share.return_value = result_hash
         self.resource_manager.download.return_value = defer.succeed(None)
-        trust_increased = defer.Deferred()  # A trick to make it awaitable
-        self.trust.REQUESTED.increase.side_effect = trust_increased.callback
+        self.resource_manager.share.return_value = result_hash
 
         # When
         self.task_server.task_given(msg)
+        yield self.task_finished  # Wait for the task to finish
 
         # Then
-        trust_increased_key = yield trust_increased
-        self.assertEqual(trust_increased_key, task_header.task_owner.key)
-
         task_computer_root = Path(self.task_server.get_task_computer_root())
         full_result_path = task_computer_root / env_id / task_id / result_path
         self.resource_manager.share.asssert_called_once_with(full_result_path)
@@ -1816,6 +1812,17 @@ class TestNewTaskComputerIntegration(
         self.assertEqual(result_to_send.result_hash, result_hash)
         self.assertNotIn(subtask_id, self.task_server.failures_to_send)
 
+        self.trust.REQUESTED.increase.assert_called_once_with(
+            task_header.task_owner.key)
+        self.trust.REQUESTED.decrease.assert_not_called()
+
+        self.assertEqual(
+            self.task_header_keeper.method_calls, [
+                call.task_started(task_id),
+                call.task_ended(task_id)
+            ]
+        )
+
     @defer.inlineCallbacks
     def test_computation_error(self):
         # Given
@@ -1826,7 +1833,6 @@ class TestNewTaskComputerIntegration(
         error_msg = 'computation failed'
 
         async def compute(_, __):
-            # return 'aa'
             raise OSError(error_msg)
 
         prereq = LocalhostPrerequisites(compute=compute)
@@ -1853,10 +1859,10 @@ class TestNewTaskComputerIntegration(
 
         # When
         self.task_server.task_given(msg)
+        yield self.task_finished  # Wait for the task to finish
 
         # Then
-        trust_decreased_key = yield trust_decreased
-        self.assertEqual(trust_decreased_key, task_header.task_owner.key)
+        self.resource_manager.share.asssert_not_called()
 
         self.assertNotIn(subtask_id, self.task_server.results_to_send)
         failure_to_send = self.task_server.failures_to_send[subtask_id]
@@ -1865,6 +1871,17 @@ class TestNewTaskComputerIntegration(
         self.assertEqual(failure_to_send.owner, task_header.task_owner)
         self.assertIn(error_msg, failure_to_send.err_msg)
 
+        self.trust.REQUESTED.increase.assert_not_called()
+        self.trust.REQUESTED.decrease.assert_called_once_with(
+            task_header.task_owner.key)
+
+        self.assertEqual(
+            self.task_header_keeper.method_calls, [
+                call.task_started(task_id),
+                call.task_ended(task_id)
+            ]
+        )
+
     @defer.inlineCallbacks
     def test_computation_timed_out(self):
         # Given
@@ -1872,8 +1889,14 @@ class TestNewTaskComputerIntegration(
         subtask_id = 'test_subtask'
         subtask_params = {'param': 'value'}
         env_id = DockerCPUEnvironment.ENV_ID
+        result_path = 'test_result'
+        result_hash = 'test_result_hash'
 
-        prereq = LocalhostPrerequisites(compute=lambda _, __: asyncio.Future())
+        async def compute(_, __):
+            await asyncio.sleep(10)
+            return result_path
+
+        prereq = LocalhostPrerequisites(compute=compute)
 
         msg = msg_factories.tasks.TaskToComputeFactory()
         msg.compute_task_def['task_id'] = task_id
@@ -1893,10 +1916,25 @@ class TestNewTaskComputerIntegration(
         self.comp_task_keeper.get_node_for_task_id.return_value = 'test_node'
         self.comp_task_keeper.active_tasks = {task_id: comp_task_info}
         self.resource_manager.download.return_value = defer.succeed(None)
+        self.resource_manager.share.return_value = result_hash
 
         # When
         self.task_server.task_given(msg)
+        yield self.task_finished  # Wait for the task to finish
 
         # Then
+        self.resource_manager.share.asssert_not_called()
 
-        # TODO
+        self.assertNotIn(subtask_id, self.task_server.results_to_send)
+        self.assertNotIn(subtask_id, self.task_server.failures_to_send)
+
+        self.trust.REQUESTED.increase.assert_called_once_with(
+            task_header.task_owner.key)
+        self.trust.REQUESTED.decrease.assert_not_called()
+
+        self.assertEqual(
+            self.task_header_keeper.method_calls, [
+                call.task_started(task_id),
+                call.task_ended(task_id)
+            ]
+        )

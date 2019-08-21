@@ -148,11 +148,13 @@ class TaskComputerAdapter:
     ) -> defer.Deferred:
         try:
             output_file = yield computation
-            self._task_server.send_results(
-                subtask_id=subtask_id,
-                task_id=task_id,
-                task_api_result=output_file,
-            )
+            # Output file is None if computation was timed out or cancelled
+            if output_file is not None:
+                self._task_server.send_results(
+                    subtask_id=subtask_id,
+                    task_id=task_id,
+                    task_api_result=output_file,
+                )
         except Exception as e:  # pylint: disable=broad-except
             self._task_server.send_task_failed(
                 subtask_id=subtask_id,
@@ -300,12 +302,12 @@ class NewTaskComputer:
         assigned_task = self._assigned_task
         assert assigned_task is not None
 
-        compute_future = asyncio.ensure_future(
-            self._create_client_and_compute())
+        coro = self._create_client_and_compute()
+        compute_future = asyncio.ensure_future(coro)
         self._computation = deferred_from_future(compute_future)
 
         from twisted.internet import reactor
-        timeout = int(deadline_to_timeout(assigned_task.deadline))
+        timeout = max(0, int(deadline_to_timeout(assigned_task.deadline)))
         self._computation.addTimeout(timeout, reactor)
         return self._wait_until_computation_ends()
 
@@ -343,6 +345,11 @@ class NewTaskComputer:
 
         success = False
         try:
+            # from twisted.internet import reactor
+            # future = asyncio.ensure_future(asyncio.sleep(10))
+            # deferred = deferred_from_future(future)
+            # deferred.addTimeout(0, reactor)
+            # yield deferred
             output_file = yield self._computation
             logger.info(
                 'Task computation succeeded. task_id=%r subtask_id=%r',

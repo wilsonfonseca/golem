@@ -7,7 +7,7 @@ from golem_task_api import (
     RequestorAppClient
 )
 from golem_task_api.structs import Subtask
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, TimeoutError as DeferredTimeout, CancelledError
 from twisted.trial.unittest import TestCase as TwistedTestCase
 
 from golem.core.common import install_reactor
@@ -68,6 +68,35 @@ class TestLocalhostEnv(TwistedTestCase):
         ))
         result = yield deferred_from_future(compute_future)
         self.assertEqual(result, Path(result_path))
+
+    @inlineCallbacks
+    def test_compute_timeout(self):
+        subtask_id = 'test_subtask'
+        subtask_params = {'param': 'value'}
+        result_path = 'test_result'
+
+        async def compute(given_id, given_params):
+            await asyncio.sleep(10)
+            assert given_id == subtask_id
+            assert given_params == subtask_params
+            return result_path
+
+        prereq = LocalhostPrerequisites(compute=compute)
+        service = self._get_service(prereq)
+        client_future = asyncio.ensure_future(ProviderAppClient.create(service))
+        client = yield deferred_from_future(client_future)
+        compute_future = asyncio.ensure_future(client.compute(
+            task_id='test_task',
+            subtask_id=subtask_id,
+            subtask_params=subtask_params
+        ))
+        # compute_future = asyncio.ensure_future(compute(subtask_id, subtask_params))
+        compute_deferred = deferred_from_future(compute_future)
+        from twisted.internet import reactor
+        # compute_deferred.addTimeout(1, reactor)
+        yield client._service._runtime.stop()
+        # with self.assertRaises(DeferredTimeout):
+        result = yield compute_deferred
 
     @inlineCallbacks
     def test_benchmark(self):
