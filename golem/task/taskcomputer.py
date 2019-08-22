@@ -320,6 +320,8 @@ class NewTaskComputer:
         )
 
         self._app_client = await ProviderAppClient.create(task_api_service)
+        import time
+        time.sleep(2)
         return await self._app_client.compute(
             task_id=assigned_task.task_id,
             subtask_id=assigned_task.subtask_id,

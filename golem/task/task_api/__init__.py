@@ -70,3 +70,4 @@ class EnvironmentTaskApiService(TaskApiService):
         assert self._runtime is not None
         loop = asyncio.get_event_loop()
         await self._runtime.wait_until_stopped().asFuture(loop)
+        await self._runtime.clean_up().asFuture(loop)

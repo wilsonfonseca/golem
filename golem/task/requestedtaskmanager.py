@@ -76,6 +76,10 @@ class DirManager:
         task_net_results_dir = self.get_network_results_dir(app_id, task_id)
         task_net_results_dir.mkdir()
 
+    def get_resources_dir(self, app_id, task_id):
+        task_dir = self._get_task_dir(app_id, task_id)
+        return task_dir / constants.RESOURCES_DIR
+
     def get_network_resources_dir(self, app_id, task_id):
         task_dir = self._get_task_dir(app_id, task_id)
         return task_dir / constants.NETWORK_RESOURCES_DIR
@@ -204,6 +208,10 @@ class RequestedTaskManager:
         task = RequestedTask.get(RequestedTask.task_id == task_id)
         return task.status.is_completed()
 
+    def get_resources_dir(self, task_id: TaskId) -> Path:
+        task = RequestedTask.get(RequestedTask.task_id == task_id)
+        return self._dir_manager.get_resources_dir(task.app_id, task_id)
+
     def get_task_network_resources_dir(self, task_id: TaskId) -> Path:
         """ Return a path to the directory of the task network resources. """
         task = RequestedTask.get(RequestedTask.task_id == task_id)
@@ -268,7 +276,7 @@ class RequestedTaskManager:
             subtask_id=result.subtask_id,
             status=SubtaskStatus.starting,
             payload=result.params,
-            inputs=result.resources,
+            inputs=list(map(str, result.resources)),
             start_time=default_now(),
             price=task.max_price_per_hour,
             computing_node=node,
@@ -360,6 +368,8 @@ class RequestedTaskManager:
             logger.info(
                 'app_client created for app_id=%r, clients=%r',
                 app_id, self._app_clients[app_id])
+            import time
+            time.sleep(2)
         return self._app_clients[app_id]
 
     def _get_task_api_service(
