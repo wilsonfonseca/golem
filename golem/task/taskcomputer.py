@@ -208,9 +208,13 @@ class TaskComputerAdapter:
             config_desc=config_desc,
             in_background=in_background))
 
-    def quit(self) -> None:
-        sync_wait(self._new_computer.clean_up())
+    @defer.inlineCallbacks
+    def quit(self) -> defer.Deferred:
+        yield self._new_computer.clean_up()
         self._old_computer.quit()
+
+    def resume(self) -> None:
+        sync_wait(self._new_computer.prepare())
 
 
 class NewTaskComputer:
@@ -244,6 +248,7 @@ class NewTaskComputer:
     @defer.inlineCallbacks
     def prepare(self) -> defer.Deferred:
         # FIXME: Decide when and how to prepare environments
+        logger.debug('NewTaskComputer.prepare')
         docker_env = self._env_manager.environment(DockerCPUEnvironment.ENV_ID)
         yield docker_env.prepare()
 
