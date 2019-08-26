@@ -174,26 +174,20 @@ def do_replace(input_file,
                replacement_source,
                output_file,
                stream_type,
-               container=None,
-               strip_unsupported_data_streams=False,
-               strip_unsupported_subtitle_streams=False):
+               container=None):
 
     commands.replace_streams(
         input_file,
         replacement_source,
         output_file,
         stream_type,
-        container,
-        strip_unsupported_data_streams,
-        strip_unsupported_subtitle_streams)
+        container)
 
 
 def do_merge_and_replace(input_file,
                          chunks,
                          output_file,
-                         container=None,
-                         strip_unsupported_data_streams=False,
-                         strip_unsupported_subtitle_streams=False):
+                         container=None):
 
     output_basename = os.path.basename(output_file)
     [output_stem, output_extension] = os.path.splitext(output_basename)
@@ -208,9 +202,7 @@ def do_merge_and_replace(input_file,
         intermediate_file,
         output_file,
         'v',
-        container,
-        strip_unsupported_data_streams,
-        strip_unsupported_subtitle_streams)
+        container)
 
 
 def compute_metric(cmd, function):
@@ -273,17 +265,13 @@ def run_ffmpeg(params):
             params['replacement_source'],
             params['output_file'],
             params['stream_type'],
-            params.get('container'),
-            params.get('strip_unsupported_data_streams'),
-            params.get('strip_unsupported_subtitle_streams'))
+            params.get('container'))
     elif params['command'] == "merge-and-replace":
         do_merge_and_replace(
             params['input_file'],
             params['chunks'],
             params['output_file'],
-            params.get('container'),
-            params.get('strip_unsupported_data_streams'),
-            params.get('strip_unsupported_subtitle_streams'))
+            params.get('container'))
     elif params['command'] == "compute-metrics":
         compute_metrics(
             params["metrics_params"])
